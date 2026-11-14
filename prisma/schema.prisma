@@ -1,0 +1,219 @@
+// AI-Based Smart Attendance Tracker - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // TEACHER | PARENT | ADMIN
+  phone     String?
+  avatarUrl String?
+  linkedId  String?  // ID of Teacher/Parent record
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  classes   String   // JSON array as string, e.g., '["CSE-A","CSE-B"]'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjects       Subject[]
+  attendanceSessions AttendanceSession[]
+}
+
+model Parent {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  email     String
+  phone     String?
+  studentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  Student  @relation(fields: [studentId], references: [id])
+  feedback Feedback[]
+}
+
+model Student {
+  id                   String   @id @default(cuid())
+  rollNumber           String
+  name                 String
+  class                String   // e.g., "CSE"
+  section              String   // e.g., "A"
+  className            String   // e.g., "CSE-A"
+  photoUrl             String?
+  parentName           String
+  parentPhone          String?
+  attendancePercentage Float    @default(0)
+  totalAttended        Int      @default(0)
+  totalSessions        Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  parents           Parent[]
+  attendanceRecords AttendanceRecord[]
+  marks             Mark[]
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  code      String
+  className String   // e.g., "CSE-A"
+  teacherId String
+  createdAt DateTime @default(now())
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+}
+
+model AttendanceSession {
+  id           String   @id @default(cuid())
+  className    String
+  section      String
+  subjectId    String?
+  subjectName  String
+  date         String   // ISO date "2026-10-05"
+  period       Int
+  teacherId    String
+  totalStudents Int     @default(0)
+  presentCount Int      @default(0)
+  absentCount  Int      @default(0)
+  gpsVerified  Boolean  @default(false)
+  gpsDistance  Float?
+  method       String   @default("AI")
+  createdAt    DateTime @default(now())
+
+  teacher Teacher            @relation(fields: [teacherId], references: [id])
+  records AttendanceRecord[]
+}
+
+model AttendanceRecord {
+  id                String   @id @default(cuid())
+  sessionId         String
+  studentId         String
+  studentName       String
+  rollNumber        String
+  status            String   // PRESENT | ABSENT | LATE
+  method            String   // AI | MANUAL
+  confidence        Float?   // 0-100
+  manuallyModified  Boolean  @default(false)
+  anomalyFlag       Boolean  @default(false)
+  anomalyReason     String?
+  date              String
+  className         String
+  createdAt         DateTime @default(now())
+
+  session AttendanceSession @relation(fields: [sessionId], references: [id])
+  student Student            @relation(fields: [studentId], references: [id])
+}
+
+model Mark {
+  id            String   @id @default(cuid())
+  studentId     String
+  subjectName   String
+  examName      String
+  maxMarks      Int
+  obtainedMarks Int
+  percentage    Float
+  examDate      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id])
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        String   // ISO date
+  description String
+  createdBy    String?
+  createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // ATTENDANCE | HOLIDAY | FEEDBACK | MARKS | ALERT
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  parentId   String
+  parentName String
+  studentId  String
+  studentName String
+  subject    String
+  message    String
+  priority   String   // LOW | MEDIUM | HIGH
+  status     String   // PENDING | REPLIED | RESOLVED
+  teacherReply String?
+  repliedAt  DateTime?
+  repliedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  parent Parent @relation(fields: [parentId], references: [id])
+}
+
+model Anomaly {
+  id        String   @id @default(cuid())
+  sessionId String?
+  studentId String?
+  reason    String
+  severity  String   // LOW | MEDIUM | HIGH
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Timetable {
+  id        String   @id @default(cuid())
+  className  String   // e.g., "CSE-A"
+  day        String   // MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY
+  period     Int      // 1-8
+  subjectName String
+  teacherName String
+  startTime  String   // "09:00"
+  endTime    String   // "09:50"
+  room       String?
+  createdAt  DateTime @default(now())
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  examName    String   // Mid Term, Final, Unit Test 1
+  subjectName String
+  className   String
+  date        String   // ISO date
+  startTime   String
+  endTime     String
+  room        String?
+  maxMarks    Int      @default(100)
+  syllabus    String?
+  createdAt   DateTime @default(now())
+}
